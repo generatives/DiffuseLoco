@@ -74,10 +74,12 @@ class TrainDiffusionTransformerLowdimWorkspace(BaseWorkspace):
 
         # configure dataset
         dataset: BaseLowdimDataset
+        print("cfg.task.dataset: ", cfg.task.dataset)
         dataset = hydra.utils.instantiate(cfg.task.dataset)
         assert isinstance(dataset, BaseLowdimDataset)
         train_dataloader = DataLoader(dataset, **cfg.dataloader)
         normalizer = dataset.get_normalizer()
+
 
         # configure validation dataset
         val_dataset = dataset.get_validation_dataset()

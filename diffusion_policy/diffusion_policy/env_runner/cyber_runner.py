@@ -28,7 +28,7 @@ class LeggedRunner(BaseLowdimRunner):
             n_obs_steps=8,
             n_action_steps=8,
             n_latency_steps=0,
-            fps=10,
+            fps=50,
             crf=22,
             agent_keypoints=False,
             past_action=False,
@@ -48,7 +48,7 @@ class LeggedRunner(BaseLowdimRunner):
 
         # prepare environment        
         
-        env_cfg.env.num_envs = 100
+        env_cfg.env.num_envs = 1
         
         # breakpoint()
         env, _ = task_registry.make_env(name=self.task, args=None, env_cfg=env_cfg)

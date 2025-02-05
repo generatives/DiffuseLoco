@@ -2,6 +2,7 @@
 Usage:
 python eval.py --checkpoint data/image/pusht/diffusion_policy_cnn/train_0/checkpoints/latest.ckpt -o data/pusht_eval_output
 """
+# fmt: off
 
 import sys
 # use line-buffering for both stdout and stderr
@@ -25,6 +26,9 @@ from omegaconf import OmegaConf
 
 from diffusion_policy.workspace.base_workspace import BaseWorkspace
 
+# fmt: on
+
+
 @click.command()
 @click.option("-c", "--checkpoint", required=True)
 @click.option("-d", "--device", default="cuda:0")
@@ -35,40 +39,55 @@ from diffusion_policy.workspace.base_workspace import BaseWorkspace
 @click.option("--generate_data", default=False)
 def main(checkpoint, device, task, output_dir, online, generate_data, **kwargs):
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
-    
+
     # load checkpoint
     payload = torch.load(open(checkpoint, "rb"), pickle_module=dill)
     cfg = payload["cfg"]
+    # print dict keys
 
+    def print_multi_level_dict(d, indent=0, depth=3):
+        if depth > 0:
+            for key, value in d.items():
+                if isinstance(value, dict) or isinstance(value, DictConfig):
+                    print('\t' * indent + str(key))
+                    print_multi_level_dict(value, indent+1, depth-1)
+                else:
+                    print('\t' * indent + str(key)+":"+str(value))
+
+    # print_multi_level_dict(cfg)
+    # print methods
+    # print(cfg)
+    # print((cfg.task.env_runner))
+    # return
 
     OmegaConf.set_struct(cfg, False)
 
     cfg.task.env_runner["device"] = device
     cfg["task"]["env_runner"]["_target_"] = "diffusion_policy.env_runner.cyber_runner.LeggedRunner"
     print("Using {0} number of observation steps.".format(cfg["task"]["env_runner"]["n_obs_steps"]))
-    
+
     cls = hydra.utils.get_class(cfg._target_)
     print(f"Loading workspace {cls.__name__}")
     workspace = cls(cfg, output_dir=output_dir)
     workspace: BaseWorkspace
     workspace.load_payload(payload, exclude_keys=None, include_keys=None)
-    
+
     # get policy from workspace
     policy = workspace.model
     if cfg.training.use_ema:
         policy = workspace.ema_model
-    
+
     device = torch.device(device)
     policy.to(device)
     policy.eval()
-    
+
     # run eval
     env_runner = hydra.utils.instantiate(
         cfg.task.env_runner,
         output_dir=output_dir,
         task=task)
     env_runner.run(policy, online=online, generate_data=generate_data)
-    
+
 
 if __name__ == "__main__":
     main()

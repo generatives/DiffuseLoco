@@ -23,7 +23,7 @@ class CyberDogDataset(BaseLowdimDataset):
             max_train_episodes=None
             ):
         super().__init__()
-
+        print("inside CyberDogDataset:", zarr_path)
         self.replay_buffer = ReplayBuffer.copy_from_path(
             zarr_path, keys=[state_key, action_key])
 

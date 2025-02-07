@@ -22,6 +22,7 @@ import torch
 import dill
 import wandb
 import json
+import omegaconf
 from omegaconf import OmegaConf
 
 from diffusion_policy.workspace.base_workspace import BaseWorkspace
@@ -48,13 +49,13 @@ def main(checkpoint, device, task, output_dir, online, generate_data, **kwargs):
     def print_multi_level_dict(d, indent=0, depth=3):
         if depth > 0:
             for key, value in d.items():
-                if isinstance(value, dict) or isinstance(value, DictConfig):
+                if isinstance(value, dict) or isinstance(value, omegaconf.dictconfig.DictConfig):
                     print('\t' * indent + str(key))
                     print_multi_level_dict(value, indent+1, depth-1)
                 else:
                     print('\t' * indent + str(key)+":"+str(value))
 
-    # print_multi_level_dict(cfg)
+    print_multi_level_dict(cfg)
     # print methods
     # print(cfg)
     # print((cfg.task.env_runner))

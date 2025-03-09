@@ -48,7 +48,7 @@ class LeggedRunner(BaseLowdimRunner):
 
         # prepare environment
 
-        env_cfg.env.num_envs = 1
+        env_cfg.env.num_envs = 1024
 
         # breakpoint()
         env, _ = task_registry.make_env(name=self.task, args=None, env_cfg=env_cfg)
@@ -91,7 +91,7 @@ class LeggedRunner(BaseLowdimRunner):
         single_obs_dict = {"obs": state_history[:, -1, :].to("cuda:0")}
 
         save_zarr = generate_data
-        len_to_save = 1200 if not generate_data else 1200
+        len_to_save = 1200 if not generate_data else 500000
         print("length to save", len_to_save)
 
         if save_zarr:
@@ -134,7 +134,7 @@ class LeggedRunner(BaseLowdimRunner):
         while True:
             # run policy
             with torch.no_grad():
-
+                # PROBLEM: task encoding?
                 if "hop" in self.task:
                     state_history[:, -policy.n_obs_steps-1:-1, 6:9] = torch.tensor([.7, 0., 0.])
                 if "bounce" in self.task:

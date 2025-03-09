@@ -48,7 +48,7 @@ class LeggedRunner(BaseLowdimRunner):
 
         # prepare environment
 
-        env_cfg.env.num_envs = 1024
+        env_cfg.env.num_envs = 100
 
         # breakpoint()
         env, _ = task_registry.make_env(name=self.task, args=None, env_cfg=env_cfg)

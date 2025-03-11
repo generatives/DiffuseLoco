@@ -9,7 +9,8 @@ import numpy as np
 from isaacgym import gymtorch
 from isaacgym.torch_utils import *
 import pickle
-import os, copy
+import os
+import copy
 from PIL import Image as im
 from PIL import ImageDraw
 from isaacgym.terrain_utils import *
@@ -17,33 +18,34 @@ from isaacgym.terrain_utils import *
 # import rospy
 # from std_msgs.msg import Float32MultiArray
 
+
 class CyberStandDanceEnv(CyberEnv):
 
     def get_diffusion_action(self):
         return self.actions
+
     def get_diffusion_observation(self):
         commands = self.commands.clone()
-        mask = commands[:,1] != 0
+        mask = commands[:, 1] != 0
         commands[mask, 0] = commands[mask, 1]
         commands[:, 2] = 0
         commands[:, 1] = -1
-        return  torch.cat((  
+        return torch.cat((
             self.projected_gravity,
             self.projected_forward_vec,
             commands[:, :3] * self.commands_scale[:3],
             (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
             self.dof_vel * self.obs_scales.dof_vel,
-            self.actions,       
-        ), dim=-1)    
-    
+            self.actions,
+        ), dim=-1)
 
     def _compute_common_obs(self):
         # self.commands[::2,2] = 0.05*np.pi
         # self.commands[1::2,2] = -0.05*np.pi
         # self.commands[self.episode_length_buf < 50, 2] = 0.
         obs_commands = self.commands[:, :3]
-        obs_commands[:, [0,1]] = obs_commands[:, [1,0]]
-        obs_commands[:, 2] = 0. 
+        obs_commands[:, [0, 1]] = obs_commands[:, [1, 0]]
+        obs_commands[:, 2] = 0.
         common_obs_buf = torch.cat((self.projected_gravity,
                                     self.projected_forward_vec,
                                     obs_commands * self.commands_scale,
@@ -51,17 +53,17 @@ class CyberStandDanceEnv(CyberEnv):
                                     self.dof_vel * self.obs_scales.dof_vel,
                                     self.actions,
                                     self.clock_inputs[:, -2:],
-                                    ),dim=-1)
-        if self.cfg.env.obs_t: #default is False
+                                    ), dim=-1)
+        if self.cfg.env.obs_t:  # default is False
             common_obs_buf = torch.cat([
-                common_obs_buf, 
+                common_obs_buf,
                 torch.clamp(self.episode_length_buf / self.cfg.rewards.allow_contact_steps, 0., 1.).unsqueeze(dim=-1)
             ], dim=-1)
         # self.pub.publish(Float32MultiArray(data=(self.root_states[:,:2]).reshape(-1).cpu().numpy()))
 
         return common_obs_buf
-    
-    def _get_noise_scale_vec(self, cfg):#+6 hand targets
+
+    def _get_noise_scale_vec(self, cfg):  # +6 hand targets
         """ Sets a vector used to scale the noise added to the observations.
             [NOTE]: Must be adapted when changing the observations structure
 
@@ -82,12 +84,12 @@ class CyberStandDanceEnv(CyberEnv):
         noise_vec[start_index: start_index + 3] = 0.
         noise_vec[start_index + 3:start_index + 15] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
         noise_vec[start_index + 15:start_index + 27] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
-        noise_vec[start_index + 27:start_index + 39] = 0. # previous actions
-        noise_vec[start_index + 39: start_index + 41] = 0. # clock input
+        noise_vec[start_index + 27:start_index + 39] = 0.  # previous actions
+        noise_vec[start_index + 39: start_index + 41] = 0.  # clock input
         start_index = start_index + 41
         assert start_index == self.cfg.env.num_single_state
         return noise_vec
-    
+
     def check_termination(self):
         """ Check if environments need to be reset
         """
@@ -101,19 +103,20 @@ class CyberStandDanceEnv(CyberEnv):
         )
         position_protect = torch.logical_and(
             self.episode_length_buf > 3, torch.any(torch.logical_or(
-            self.dof_pos < self.dof_pos_hard_limits[:, 0] + 5 / 180 * np.pi, 
-            self.dof_pos > self.dof_pos_hard_limits[:, 1] - 5 / 180 * np.pi
-        ), dim=-1))
+                self.dof_pos < self.dof_pos_hard_limits[:, 0] + 5 / 180 * np.pi,
+                self.dof_pos > self.dof_pos_hard_limits[:, 1] - 5 / 180 * np.pi
+            ), dim=-1))
         stand_air_condition = torch.logical_and(
             torch.logical_and(self.episode_length_buf > 3, self.episode_length_buf <= self.cfg.rewards.allow_contact_steps),
-            torch.any((self.foot_positions[:, -2:, 2] - self._get_heights_at_points(self.foot_positions[:, -2:, :2])) > 0.06, dim=-1)
+            torch.any((self.foot_positions[:, -2:, 2] -
+                      self._get_heights_at_points(self.foot_positions[:, -2:, :2])) > 0.06, dim=-1)
         )
         abrupt_change_condition = torch.logical_and(
             torch.logical_and(self.episode_length_buf > 3, self.episode_length_buf <= self.cfg.rewards.allow_contact_steps),
             torch.any(torch.abs(self.dof_pos - self.last_dof_pos) > self.cfg.asset.max_dof_change, dim=-1)
         )
 
-        self.time_out_buf = self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
+        self.time_out_buf = self.episode_length_buf > self.max_episode_length  # no terminal reward for time-outs
         self.reset_buf |= self.time_out_buf
         # self.reset_buf |= position_protect
         # self.reset_buf |= stand_air_condition
@@ -122,14 +125,20 @@ class CyberStandDanceEnv(CyberEnv):
     def update_command_curriculum(self, env_ids):
         if "tracking_lin_vel" in self.episode_sums and torch.mean(self.episode_sums["tracking_lin_vel"][env_ids]) / self.max_episode_length > 0.8 * self.reward_scales["tracking_lin_vel"]:
             # self.command_ranges["lin_vel_x"][0] = 0. # no backward vel
-            self.command_ranges["lin_vel_x"][0] = np.clip(self.command_ranges["lin_vel_x"][0] - 0.2, -self.cfg.commands.max_curriculum, 0.)
-            self.command_ranges["lin_vel_x"][1] = np.clip(self.command_ranges["lin_vel_x"][1] + 0.2, 0., self.cfg.commands.max_curriculum)
+            self.command_ranges["lin_vel_x"][0] = np.clip(
+                self.command_ranges["lin_vel_x"][0] - 0.2, -self.cfg.commands.max_curriculum, 0.)
+            self.command_ranges["lin_vel_x"][1] = np.clip(
+                self.command_ranges["lin_vel_x"][1] + 0.2, 0., self.cfg.commands.max_curriculum)
             # no side vel
-            self.command_ranges["lin_vel_y"][0] = np.clip(self.command_ranges["lin_vel_y"][0] - 0.2, -self.cfg.commands.max_curriculum, 0.)
-            self.command_ranges["lin_vel_y"][1] = np.clip(self.command_ranges["lin_vel_y"][1] + 0.2, 0., self.cfg.commands.max_curriculum)
+            self.command_ranges["lin_vel_y"][0] = np.clip(
+                self.command_ranges["lin_vel_y"][0] - 0.2, -self.cfg.commands.max_curriculum, 0.)
+            self.command_ranges["lin_vel_y"][1] = np.clip(
+                self.command_ranges["lin_vel_y"][1] + 0.2, 0., self.cfg.commands.max_curriculum)
         if "tracking_ang_vel" in self.episode_sums and torch.mean(self.episode_sums["tracking_ang_vel"][env_ids]) / self.max_episode_length > 0.8 * self.reward_scales["tracking_ang_vel"]:
-            self.command_ranges["ang_vel_yaw"][0] = np.clip(self.command_ranges["ang_vel_yaw"][0] - 0.2, -self.cfg.commands.max_curriculum, 0.)
-            self.command_ranges["ang_vel_yaw"][1] = np.clip(self.command_ranges["ang_vel_yaw"][1] + 0.2, 0., self.cfg.commands.max_curriculum)
+            self.command_ranges["ang_vel_yaw"][0] = np.clip(
+                self.command_ranges["ang_vel_yaw"][0] - 0.2, -self.cfg.commands.max_curriculum, 0.)
+            self.command_ranges["ang_vel_yaw"][1] = np.clip(
+                self.command_ranges["ang_vel_yaw"][1] + 0.2, 0., self.cfg.commands.max_curriculum)
 
     def _init_buffers(self):
         super()._init_buffers()
@@ -137,7 +146,7 @@ class CyberStandDanceEnv(CyberEnv):
         self.init_feet_positions = torch.zeros((self.num_envs, 4, 3), dtype=torch.float, device=self.device)
         # rospy.init_node('traj', anonymous=True)
         # self.pub = rospy.Publisher('/traj', Float32MultiArray, queue_size=10)
-        
+
     def _resample_commands(self, env_ids):
         super()._resample_commands(env_ids)
         if self.cfg.commands.discretize:
@@ -148,7 +157,7 @@ class CyberStandDanceEnv(CyberEnv):
         super().reset_idx(env_ids)
         heading = self._get_cur_heading()
         self.last_heading[env_ids] = heading[env_ids]
-    
+
     def post_physics_step(self):
         """ check terminations, compute observations and rewards
             calls self._post_physics_step_callback() for common computations 
@@ -183,7 +192,7 @@ class CyberStandDanceEnv(CyberEnv):
         self.compute_reward()
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
         self.reset_idx(env_ids)
-        self.compute_observations() # in some cases a simulation step might be required to refresh some obs (for example body positions)
+        self.compute_observations()  # in some cases a simulation step might be required to refresh some obs (for example body positions)
 
         self.last_actions[:] = self.actions[:]
         self.last_dof_vel[:] = self.dof_vel[:]
@@ -204,8 +213,9 @@ class CyberStandDanceEnv(CyberEnv):
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        self.dof_pos[env_ids] = self.init_dof_pos_range[:, 0] + torch_rand_float(0., 1., (len(env_ids), self.num_dof), device=self.device) * (self.init_dof_pos_range[:, 1] - self.init_dof_pos_range[:, 0])
-        
+        self.dof_pos[env_ids] = self.init_dof_pos_range[:, 0] + torch_rand_float(
+            0., 1., (len(env_ids), self.num_dof), device=self.device) * (self.init_dof_pos_range[:, 1] - self.init_dof_pos_range[:, 0])
+
         self.dof_vel[env_ids] = torch_rand_float(-0.1, 0.1, (len(env_ids), self.num_dof), device=self.device)
 
         # TODO: Important! should feed actor id, not env id
@@ -213,12 +223,12 @@ class CyberStandDanceEnv(CyberEnv):
         self.gym.set_dof_state_tensor_indexed(self.sim,
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-    
+
     def _reset_robot_states(self, env_ids):
-        self._reset_dofs_rand(env_ids)       
+        self._reset_dofs_rand(env_ids)
         self._reset_root_states_rand(env_ids)
-    
-    def _reset_root_states_rand(self, env_ids): #changed!
+
+    def _reset_root_states_rand(self, env_ids):  # changed!
         """ Resets ROOT states position and velocities of selected environmments
             Sets base position based on the curriculum
             Selects randomized base velocities within -0.5:0.5 [m/s, rad/s]
@@ -230,23 +240,25 @@ class CyberStandDanceEnv(CyberEnv):
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
             if self.cfg.mode == "train":
-                self.root_states[env_ids, 1:2] += torch_rand_float(-2., 2., (len(env_ids), 1), device=self.device) # y position within 2m of the center
+                # y position within 2m of the center
+                self.root_states[env_ids, 1:2] += torch_rand_float(-2., 2., (len(env_ids), 1), device=self.device)
             self.env_origins_new[env_ids] = self.root_states[env_ids, :3]
         else:
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
         if self.cfg.init_state.randomize_rot:
-            rand_rpy = torch_rand_float(-np.pi*15/180.0, np.pi*15/180.0, (len(env_ids), 3), device=self.device) #参数：rand在正负15度
-            rand_rpy=rand_rpy+torch.Tensor(get_euler_xyz(self.base_init_state[3:7].unsqueeze(0))).to(self.device)
-            self.root_states[env_ids, 3: 7] = quat_from_euler_xyz(rand_rpy[:, 0], rand_rpy[:, 1], rand_rpy[:, 2])  #!!!changed to +=
+            rand_rpy = torch_rand_float(-np.pi*15/180.0, np.pi*15/180.0, (len(env_ids), 3), device=self.device)  # 参数：rand在正负15度
+            rand_rpy = rand_rpy+torch.Tensor(get_euler_xyz(self.base_init_state[3:7].unsqueeze(0))).to(self.device)
+            self.root_states[env_ids, 3: 7] = quat_from_euler_xyz(
+                rand_rpy[:, 0], rand_rpy[:, 1], rand_rpy[:, 2])  # !!!changed to +=
         # base velocities
-        self.root_states[env_ids, 7:13] = torch_rand_float(-0.1, 0.1, (len(env_ids), 6), device=self.device)  # [7:10]: lin vel, [10:13]: ang vel
+        # [7:10]: lin vel, [10:13]: ang vel
+        self.root_states[env_ids, 7:13] = torch_rand_float(-0.1, 0.1, (len(env_ids), 6), device=self.device)
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self.root_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-        
-    
+
     def _recompute_ang_vel(self):
         # self.commands[::2, 3] = self.episode_length_buf[::2] / 500 * np.pi
         # self.commands[1::2, 3] = -self.episode_length_buf[1::2] / 500 * np.pi
@@ -254,22 +266,23 @@ class CyberStandDanceEnv(CyberEnv):
         self.commands[:, 2] = torch.clip(
             0.5*wrap_to_pi(self.commands[:, 3] - heading), -self.cfg.commands.clip_ang_vel, self.cfg.commands.clip_ang_vel
         ) * (0.5 * np.pi / self.cfg.commands.clip_ang_vel)
-    
+
     def _reward_lift_up(self):
         root_height = self.root_states[:, 2]
-        root_height -= torch.mean(self._get_heights_at_points(self.foot_positions[:, -2:, :2]), dim = 1)
+        root_height -= torch.mean(self._get_heights_at_points(self.foot_positions[:, -2:, :2]), dim=1)
         delta_height = root_height - self.cfg.rewards.liftup_target
         error = torch.square(delta_height)
-        reward = torch.exp(- error / self.cfg.rewards.tracking_liftup_sigma) #use tracking sigma
+        reward = torch.exp(- error / self.cfg.rewards.tracking_liftup_sigma)  # use tracking sigma
         return reward
 
     def _reward_lift_up_linear(self):
         root_height = self.root_states[:, 2]
-        root_height -= torch.mean(self._get_heights_at_points(self.foot_positions[:, -2:, :2]), dim = 1)
-        reward = (root_height - self.cfg.rewards.lift_up_threshold[0]) / (self.cfg.rewards.lift_up_threshold[1] - self.cfg.rewards.lift_up_threshold[0])
+        root_height -= torch.mean(self._get_heights_at_points(self.foot_positions[:, -2:, :2]), dim=1)
+        reward = (root_height - self.cfg.rewards.lift_up_threshold[0]) / \
+            (self.cfg.rewards.lift_up_threshold[1] - self.cfg.rewards.lift_up_threshold[0])
         reward = torch.clamp(reward, 0., 1.)
         return reward
-    
+
     def _reward_tracking_lin_vel(self):
         if not self.cfg.env.vel_cmd:
             self.commands[:, :2] = 0.
@@ -283,11 +296,11 @@ class CyberStandDanceEnv(CyberEnv):
         scale_factor_low = self.cfg.rewards.scale_factor_low
         scale_factor_high = self.cfg.rewards.scale_factor_high
         scaling_factor = (torch.clip(
-            self.root_states[:, 2] - torch.mean(self._get_heights_at_points(self.foot_positions[:, -2:, :2]), dim = 1), min=scale_factor_low, max=scale_factor_high
+            self.root_states[:, 2] - torch.mean(self._get_heights_at_points(self.foot_positions[:, -2:, :2]), dim=1), min=scale_factor_low, max=scale_factor_high
         ) - scale_factor_low) / (scale_factor_high - scale_factor_low)
         reward = reward * is_stand.float() * scaling_factor
         return reward
-    
+
     def _reward_tracking_ang_vel(self):
         if not self.cfg.env.vel_cmd:
             self.commands[:, 3] = 0.
@@ -316,28 +329,50 @@ class CyberStandDanceEnv(CyberEnv):
         scale_factor_low = self.cfg.rewards.scale_factor_low
         scale_factor_high = self.cfg.rewards.scale_factor_high
         scaling_factor = (torch.clip(
-            self.root_states[:, 2] - torch.mean(self._get_heights_at_points(self.foot_positions[:, -2:, :2]), dim = 1), min=scale_factor_low, max=scale_factor_high
+            self.root_states[:, 2] - torch.mean(self._get_heights_at_points(self.foot_positions[:, -2:, :2]), dim=1), min=scale_factor_low, max=scale_factor_high
         ) - scale_factor_low) / (scale_factor_high - scale_factor_low)
         reward = reward * is_stand.float() * scaling_factor
         return reward
-    
+
     def _reward_feet_clearance_cmd_linear(self):
+        """
+        Reward for gait and swing trajectory.
+
+        This function calculates the reward for feet clearance based on the linear command.
+        It computes the phases, foot height, terrain height at foot position, target height,
+        and the reward for foot clearance. The reward is calculated as the squared difference
+        between the target height and foot height, multiplied by the complement of the desired
+        contact states. The reward is then multiplied by a condition that checks if the episode
+        length is greater than the allowed contact steps. Finally, the sum of the reward for foot
+        clearance is returned.
+
+        Returns:
+            torch.Tensor: The reward for foot clearance.
+        """
+        # Gait phases for the feet
         phases = 1 - torch.abs(1.0 - torch.clip((self.foot_indices[:, -2:] * 2.0) - 1.0, 0.0, 1.0) * 2.0)
-        foot_height = (self.foot_positions[:, -2:, 2]).view(self.num_envs, -1)# - reference_heights
+        # Current foot height
+        foot_height = (self.foot_positions[:, -2:, 2]).view(self.num_envs, -1)  # - reference_heights
         terrain_at_foot_height = self._get_heights_at_points(self.foot_positions[:, -2:, :2])
-        target_height = self.cfg.rewards.foot_target * phases + terrain_at_foot_height + 0.02 
+        target_height = self.cfg.rewards.foot_target * phases + terrain_at_foot_height + 0.02
         rew_foot_clearance = torch.square(target_height - foot_height) * (1 - self.desired_contact_states[:, -2:])
+        # Enable after a certain number of steps
         condition = self.episode_length_buf > self.cfg.rewards.allow_contact_steps
         rew_foot_clearance = rew_foot_clearance * condition.unsqueeze(dim=-1).float()
         return torch.sum(rew_foot_clearance, dim=1)
 
     def _reward_rear_air(self):
+        """
+        Penalize feet flying & 
+        """
+        # feet contact, 1 if no contact, 0 if contact
         contact = self.contact_forces[:, self.feet_indices[-2:], 2] < 1.
         calf_contact = self.contact_forces[:, self.calf_indices[-2:], 2] < 1.
+        # Only calf contact
         unhealthy_condition = torch.logical_and(~calf_contact, contact)
         reward = torch.all(contact, dim=1).float() + unhealthy_condition.sum(dim=-1).float()
         return reward
-    
+
     def _reward_stand_air(self):
         stand_air_condition = torch.logical_and(
             torch.logical_and(
@@ -346,14 +381,14 @@ class CyberStandDanceEnv(CyberEnv):
             ), torch.any((self.foot_positions[:, -2:, 2] - self._get_heights_at_points(self.foot_positions[:, -2:, :2])) > 0.03, dim=1)
         )
         return stand_air_condition.float()
-    
+
     def _reward_foot_twist(self):
         vxy = torch.norm(self.foot_velocities[:, :, :2], dim=-1)
         vang = torch.norm(self.foot_velocities_ang, dim=-1)
         condition = (self.foot_positions[:, :, 2] - self._get_heights_at_points(self.foot_positions[:, :, :2])) < 0.025
         reward = torch.mean((vxy + 0.1 * vang) * condition.float(), dim=1)
         return reward
-    
+
     def _reward_feet_slip(self):
         condition = (self.foot_positions[:, :, 2] - self._get_heights_at_points(self.foot_positions[:, :, :2])) < 0.03
         # xy lin vel
@@ -369,19 +404,19 @@ class CyberStandDanceEnv(CyberEnv):
         desired_foot_positions[:, :, 2] += self._get_heights_at_points(self.foot_positions[:, -2:, :2])
         rear_foot_shift = torch.norm(self.foot_positions[:, 2:] - desired_foot_positions, dim=-1).mean(dim=1)
         init_ffoot_positions = torch.clone(self.init_feet_positions[:, :2])
-        front_foot_shift = torch.norm( torch.stack([
-            (init_ffoot_positions[:, :, 0] - self.foot_positions[:, :2, 0]).clamp(min=0), 
+        front_foot_shift = torch.norm(torch.stack([
+            (init_ffoot_positions[:, :, 0] - self.foot_positions[:, :2, 0]).clamp(min=0),
             torch.abs(init_ffoot_positions[:, :, 1] - self.foot_positions[:, :2, 1])
         ], dim=-1), dim=-1).mean(dim=1)
         condition = self.episode_length_buf < self.cfg.rewards.allow_contact_steps
         reward = (front_foot_shift + rear_foot_shift) * condition.float()
         return reward
-    
+
     def _reward_front_contact_force(self):
         force = torch.norm(self.contact_forces[:, self.termination_contact_indices[5: 7]], dim=-1).mean(dim=1)
         reward = force
         return reward
-    
+
     def _reward_hip_still(self):
         movement = torch.abs(self.dof_pos.view(self.num_envs, 4, 3)[:, :, 0] - 0.).mean(dim=1)
         condition = self.episode_length_buf < self.cfg.rewards.allow_contact_steps
@@ -418,15 +453,13 @@ class CyberStandDanceEnv(CyberEnv):
         metrics["energy"] = power
 
         # base ang vel in yaw
-        base_ang_vel = torch.abs(self.base_ang_vel[:,2])
+        base_ang_vel = torch.abs(self.base_ang_vel[:, 2])
         base_ang_vel[~mask] = 0.
         metrics["base_ang_vel"] = base_ang_vel
         # record time
-        metrics["time"] = torch.zeros((self.num_envs, ), dtype=torch.float, device=self.device) 
+        metrics["time"] = torch.zeros((self.num_envs, ), dtype=torch.float, device=self.device)
         metrics["time"][mask] += self.dt
 
         self.metrics = metrics
-        
-
 
         return torch.zeros((self.num_envs, ), dtype=torch.float, device=self.device)

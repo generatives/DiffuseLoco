@@ -41,13 +41,13 @@ import torch
 from tqdm import tqdm
 import pickle
 
-import escnn
-from escnn.nn import FieldType
+# import escnn
+# from escnn.nn import FieldType
 from hydra import compose, initialize
-from morpho_symm.utils.robot_utils import load_symmetric_system
-from morpho_symm.nn.test_EMLP import get_kinematic_three_rep_two, get_ground_reaction_forces_rep_two
-from rsl_rl.modules import actor_critic_symmetric
-from rsl_rl.algorithms import ppo_augment
+# from morpho_symm.utils.robot_utils import load_symmetric_system
+# from morpho_symm.nn.test_EMLP import get_kinematic_three_rep_two, get_ground_reaction_forces_rep_two
+# from rsl_rl.modules import actor_critic_symmetric
+# from rsl_rl.algorithms import ppo_augment
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing

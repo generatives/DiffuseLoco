@@ -222,7 +222,7 @@ class CyberStandDanceCfgPPOAug(CyberCommonCfgPPO):
         policy_class_name = 'ActorCritic'
         algorithm_class_name = 'PPO' # PPOAugmented
         max_iterations = 20000
-        save_interval = 300
+        save_interval = 100
     class policy:
         init_noise_std = 1.0
         actor_hidden_dims = [512, 256, 128]

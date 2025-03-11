@@ -220,7 +220,7 @@ class CyberStandDanceCfgPPOAug(CyberCommonCfgPPO):
     class runner(CyberCommonCfgPPO.runner):
         experiment_name = "stand_dance_cyber_aug"
         policy_class_name = 'ActorCritic'
-        algorithm_class_name = 'PPOAugmented'
+        algorithm_class_name = 'PPO' # PPOAugmented
         max_iterations = 20000
         save_interval = 300
     class policy:

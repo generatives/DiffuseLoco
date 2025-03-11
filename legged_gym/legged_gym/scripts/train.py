@@ -43,7 +43,11 @@ def train(args):
     print("make env ok!")
     ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args)
     if train_cfg.use_wandb:
-        if args.task == "cyber2_stand_dance":
+        if args.task == 'cyber2_walk':
+            project_name = "isaacgym-cyber2-walk"
+        elif args.task == 'cyber2_stand':
+            project_name = "isaacgym-cyber2-stand"
+        elif args.task == "cyber2_stand_dance":
             project_name = "isaacgym-cyber2-stand-dance"
         elif args.task == "cyber2_stand_dance_aug":
             project_name = "isaacgym-cyber2-stand-dance-aug"

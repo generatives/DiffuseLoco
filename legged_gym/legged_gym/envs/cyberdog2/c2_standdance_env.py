@@ -268,6 +268,7 @@ class CyberStandDanceEnv(CyberEnv):
         ) * (0.5 * np.pi / self.cfg.commands.clip_ang_vel)
 
     def _reward_lift_up(self):
+        """Squared difference reward for body lift up."""
         root_height = self.root_states[:, 2]
         root_height -= torch.mean(self._get_heights_at_points(self.foot_positions[:, -2:, :2]), dim=1)
         delta_height = root_height - self.cfg.rewards.liftup_target
@@ -276,6 +277,7 @@ class CyberStandDanceEnv(CyberEnv):
         return reward
 
     def _reward_lift_up_linear(self):
+        """Linear reward for body lift up."""
         root_height = self.root_states[:, 2]
         root_height -= torch.mean(self._get_heights_at_points(self.foot_positions[:, -2:, :2]), dim=1)
         reward = (root_height - self.cfg.rewards.lift_up_threshold[0]) / \

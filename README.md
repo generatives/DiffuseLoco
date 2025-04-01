@@ -13,6 +13,8 @@ python ./scripts/eval.py --checkpoint=./cyberdog_final.ckpt --task=cyber2_stand 
 --online=false --generate_data=true
 ```
 
+`--online=false --generate_data=true` is used to generate the dataset for the diffusion model.
+
 Self trained policy:
 
 ```bash

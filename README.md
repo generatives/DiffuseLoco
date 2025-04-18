@@ -51,8 +51,7 @@ To generate the dataset from source RL checkpoints for each task, run the follow
 ```bash
 source env.sh
 
-python ./scripts/eval.py --checkpoint=./cyberdog_final.ckpt --task=<TASK_NAME>
---online=false --generate_dataset=true
+python ./scripts/eval.py --checkpoint=./cyberdog_final.ckpt --task=<TASK_NAME> --online=false --generate_data=true
 ```
 
 Then, use `scripts/combine_dataset.py` to combine the generated datasets (`skill_filenames` should be modified).

@@ -140,7 +140,7 @@ class LeggedRunner(BaseLowdimRunner):
                     t1 = time.perf_counter()
                     action_dict = policy.predict_action(obs_dict)
                     t2 = time.perf_counter()
-                    print("time spent diffusion step: ", t2-t1)
+                    #print("time spent diffusion step: ", t2-t1)
 
                     # try:
                     #     action_dict = policy.predict_action_init(obs_dict, action_dict["action_pred"][:,8:12,:])

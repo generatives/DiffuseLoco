@@ -164,7 +164,7 @@ class LeggedRunner(BaseLowdimRunner):
                 curr_idx = np.all(recorded_obs_episode == 0, axis=-1).argmax(axis=-1)
                 # curr_idx = idx
                 recorded_obs_episode[np.arange(env.num_envs),curr_idx,:] = single_obs_dict["obs"].to("cpu").detach().numpy()
-                recorded_acs_episode[np.arange(env.num_envs),curr_idx,:] = expert_action.to("cpu").detach().numpy()
+                recorded_acs_episode[np.arange(env.num_envs),curr_idx,:] = action.to("cpu").detach().numpy()[:, 0, :]
 
             # step env
             self.n_action_steps = action.shape[1]

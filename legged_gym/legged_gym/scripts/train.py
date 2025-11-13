@@ -62,6 +62,7 @@ def train(args):
         elif args.task == 'cyber2_walk_slope_emlp':
             project_name = "isaacgym-cyber2-walk-slope-emlp"
         else:
+            project_name = "unknown"
             pass
         wandb.init(
             config={"env_cfg": class_to_dict(env_cfg), "train_cfg": class_to_dict(train_cfg)}, 
